@@ -1,34 +1,14 @@
-from yowsup.layers.interface import YowInterfaceLayer, ProtocolEntityCallback
-from yowsup.layers.protocol_messages.protocolentities import TextMessageProtocolEntity
-from yowsup.layers.protocol_receipts.protocolentities import OutgoingReceiptProtocolEntity
-from yowsup.layers.protocol_acks.protocolentities import OutgoingAckProtocolEntity
+import sys
+import os
 
 from yowsup.layers.interface import YowInterfaceLayer, ProtocolEntityCallback
-from yowsup.layers.auth import YowAuthenticationProtocolLayer
-from yowsup.layers import YowLayerEvent
-from yowsup.layers.network import YowNetworkLayer
-import sys
-from yowsup.common import YowConstants
-import datetime
-import os
-import logging
 from yowsup.layers.protocol_receipts.protocolentities import *
-from yowsup.layers.protocol_groups.protocolentities import *
-from yowsup.layers.protocol_presence.protocolentities import *
 from yowsup.layers.protocol_messages.protocolentities import *
 from yowsup.layers.protocol_acks.protocolentities import *
-from yowsup.layers.protocol_ib.protocolentities import *
-from yowsup.layers.protocol_iq.protocolentities import *
-from yowsup.layers.protocol_contacts.protocolentities import *
-from yowsup.layers.protocol_chatstate.protocolentities import *
-from yowsup.layers.protocol_privacy.protocolentities import *
 from yowsup.layers.protocol_media.protocolentities import *
 from yowsup.layers.protocol_media.mediauploader import MediaUploader
-from yowsup.layers.protocol_profiles.protocolentities import *
-from yowsup.layers.axolotl.protocolentities.iq_key_get import GetKeysIqProtocolEntity
-from yowsup.layers.axolotl import YowAxolotlLayer
-from yowsup.common.tools import ModuleTools
-
+from yowsup.layers.network import YowNetworkLayer
+from yowsup.layers import YowLayerEvent
 
 class QueueLayer(YowInterfaceLayer):
     SEND_MESSAGE = "org.openwhatsapp.yowsup.prop.queue.sendmessage"
@@ -50,27 +30,26 @@ class QueueLayer(YowInterfaceLayer):
     def onMessage(self, messageProtocolEntity):
         # send receipt otherwise we keep receiving the same message over and over
 
-        if True:
-            receipt = OutgoingReceiptProtocolEntity(messageProtocolEntity.getId(), messageProtocolEntity.getFrom())
+        receipt = OutgoingReceiptProtocolEntity(messageProtocolEntity.getId(), messageProtocolEntity.getFrom())
 
-            # outgoingMessageProtocolEntity = TextMessageProtocolEntity(
-            #   messageProtocolEntity.getBody(),
-            #  to=messageProtocolEntity.getFrom())
-            message = messageProtocolEntity
-            if message.getType() == "text":
-                messageBody = message.getBody()
-            elif message.getType() == "media":
-                messageBody = self.getMediaMessageBody(message)
-            else:
-                messageBody = "Error : Unknown message type %s " % message.getType()
-            retItem = {
-                "body": messageBody,
-                "number": message.getFrom()
-            }
-            self.receiveQueue.put(retItem)
-            print("Received Message from %s : %s" % (messageProtocolEntity.getFrom(), messageBody))
-            self.toLower(receipt)
-            # self.toLower(outgoingMessageProtocolEntity)
+        # outgoingMessageProtocolEntity = TextMessageProtocolEntity(
+        #   messageProtocolEntity.getBody(),
+        #  to=messageProtocolEntity.getFrom())
+        message = messageProtocolEntity
+        if message.getType() == "text":
+            messageBody = message.getBody()
+        elif message.getType() == "media":
+            messageBody = self.getMediaMessageBody(message)
+        else:
+            messageBody = "Error : Unknown message type %s " % message.getType()
+        retItem = {
+            "body": messageBody,
+            "number": message.getFrom()
+        }
+        self.receiveQueue.put(retItem)
+        self.output("Received Message from %s : %s" % (messageProtocolEntity.getFrom(), messageBody))
+        self.toLower(receipt)
+        # self.toLower(outgoingMessageProtocolEntity)
 
     @ProtocolEntityCallback("receipt")
     def onReceipt(self, entity):
@@ -79,14 +58,20 @@ class QueueLayer(YowInterfaceLayer):
 
     @ProtocolEntityCallback("success")
     def onSuccess(self, entity):
+        self.output("Sucessfully Connected..")
         self.connected = True
 
     def onEvent(self, layerEvent):
+        if layerEvent.getName() == YowNetworkLayer.EVENT_STATE_DISCONNECTED:
+                self.output("Disconnected: %s" % layerEvent.getArg("reason"))
+                self.connected = False
+                connectEvent = YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT)
+                self.getStack().broadcastEvent(connectEvent)
         if self.assertConnected():
             if layerEvent.getName() == self.__class__.SEND_MESSAGE:
                 msg = layerEvent.getArg("msg")
                 number = layerEvent.getArg("number")
-                print("Send Message to %s : %s" % (number, msg))
+                self.output("Send Message to %s : %s" % (number, msg))
                 jid = self.aliasToJid(number)
                 outgoingMessageProtocolEntity = TextMessageProtocolEntity(
                     msg,
@@ -102,6 +87,7 @@ class QueueLayer(YowInterfaceLayer):
                 errorFn = lambda errorEntity, originalEntity: self.onRequestUploadError(jid, path, errorEntity,
                                                                                         originalEntity)
                 self._sendIq(entity, successFn, errorFn)
+
 
     def getMediaMessageBody(self, message):
         if message.getMediaType() in ("image", "audio", "video"):
@@ -134,7 +120,7 @@ class QueueLayer(YowInterfaceLayer):
 
     def onRequestUploadError(self, jid, path, errorRequestUploadIqProtocolEntity,
                              requestUploadIqProtocolEntity):
-        print("Request upload for file %s for %s failed" % (path, jid))
+        self.output("Request upload for file %s for %s failed" % (path, jid))
 
     def doSendImage(self, filePath, url, to, ip=None):
         entity = ImageDownloadableMediaMessageProtocolEntity.fromFilePath(filePath, url, ip, to)
@@ -144,8 +130,22 @@ class QueueLayer(YowInterfaceLayer):
         self.doSendImage(filePath, url, jid)
 
     def onUploadError(self, filePath, jid, url):
-        print("Upload file %s to %s for %s failed!" % (filePath, url, jid))
+        self.output("Upload file %s to %s for %s failed!" % (filePath, url, jid))
 
     def onUploadProgress(self, filePath, jid, url, progress):
-        sys.stdout.write("%s => %s, %d%% \r" % (os.path.basename(filePath), jid, progress))
-        sys.stdout.flush()
+        #sys.stdout.write("%s => %s, %d%% \r" % (os.path.basename(filePath), jid, progress))
+        #sys.stdout.flush()
+        self.output("%s => %s, %d%% \r" % (os.path.basename(filePath), jid, progress))
+        #pass
+
+    @ProtocolEntityCallback("notification")
+    def onNotification(self, notification):
+        notificationData = notification.__str__()
+        if notificationData:
+            self.output(notificationData)
+        else:
+            self.output("From :%s, Type: %s" % (notification.getFrom(), notification.getType()))
+        receipt = OutgoingReceiptProtocolEntity(notification.getId(), notification.getFrom())
+        self.toLower(receipt)
+    def output(self,str):
+        print(str)

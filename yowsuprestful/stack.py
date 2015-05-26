@@ -1,18 +1,12 @@
-from .layer import QueueLayer
-from yowsup.layers.auth import YowAuthenticationProtocolLayer
-from yowsup.layers.protocol_messages import YowMessagesProtocolLayer
-from yowsup.layers.protocol_receipts import YowReceiptProtocolLayer
-from yowsup.layers.protocol_acks import YowAckProtocolLayer
-from yowsup.layers.network import YowNetworkLayer
-from yowsup.layers.coder import YowCoderLayer
-from yowsup.stacks import YowStack
-from yowsup.common import YowConstants
-from yowsup.layers import YowLayerEvent
-from yowsup.stacks import YowStack, YowStackBuilder
-from yowsup import env
-from yowsup.layers.auth import AuthError
 import queue
 import threading
+
+from yowsup.layers.network import YowNetworkLayer
+from yowsup.layers import YowLayerEvent
+from yowsup.stacks import YowStackBuilder
+from yowsup.layers.auth import AuthError
+
+from .layer import QueueLayer
 
 
 class QueueStack():
