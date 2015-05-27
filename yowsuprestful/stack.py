@@ -36,10 +36,10 @@ class QueueStack():
             print("Auth Error, reason %s" % e)
 
     def sendMessage(self, number, msg):
-        self.stack.broadcastEvent(YowLayerEvent(name=QueueLayer.SEND_MESSAGE, msg=msg, number=number))
+        self.stack.broadcastEvent(YowLayerEvent(name=QueueLayer.EVENT_SEND_MESSAGE, msg=msg, number=number))
 
     def sendImage(self, number, path):
-        self.stack.broadcastEvent(YowLayerEvent(name=QueueLayer.SEND_IMAGE, path=path, number=number))
+        self.stack.broadcastEvent(YowLayerEvent(name=QueueLayer.EVENT_SEND_IMAGE, path=path, number=number))
 
     def getMessage(self):
         try:
