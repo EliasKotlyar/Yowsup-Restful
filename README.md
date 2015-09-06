@@ -1,4 +1,7 @@
-# Yowsup-Restful
+#[DEPRECATED] Yowsup-Restful
+
+# This Project is deprecated. Please consider using https://github.com/EliasKotlyar/yowsup-queue instead.
+
 
 
 This Project provides a REST-Api for the Yowsup2 Interface. You can Send/Receive Whatsapp-Messages with it.
